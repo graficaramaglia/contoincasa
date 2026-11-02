@@ -1,6 +1,6 @@
 // ContoInCasa: permette all'app di aprirsi anche senza internet.
 // Quando cambi i file dell'app, aumenta il numero di versione qui sotto.
-const VERSIONE = "contoincasa-v1";
+const VERSIONE = "contoincasa-v2";
 const FILE = [
   "./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/logo.png", "./icons/icon-192.png", "./icons/icon-512.png",
@@ -37,5 +37,28 @@ self.addEventListener("fetch", e => {
         return res;
       })
       .catch(() => caches.match(req).then(r => r || caches.match("./index.html")))
+  );
+});
+
+// Notifiche delle scadenze
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "ContoInCasa", {
+    body: d.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/favicon.png",
+    tag: d.tag || "scadenze",
+    data: { url: "./" }
+  }));
+});
+
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(finestre => {
+      for (const w of finestre) { if ("focus" in w) return w.focus(); }
+      return self.clients.openWindow("./");
+    })
   );
 });

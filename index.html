@@ -154,6 +154,13 @@ section h2 small{font-family:var(--body);font-weight:500;font-size:13px;color:va
 .login h2{margin:0;font-family:var(--display);font-weight:800;font-size:22px}
 .login p{margin:0;color:var(--muted)}
 .login .primary{background:var(--napoli);color:#fff;border:0;border-radius:12px;padding:13px;font-weight:700;font-size:16px}
+.push p{margin:0 0 12px;font-size:14px;color:var(--muted)}
+.push .state{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px}
+.push .state i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.push .state.on i{background:var(--ok)}
+.push .btns{display:flex;gap:8px;flex-wrap:wrap}
+.push .btns button{flex:1;min-width:140px;border-radius:10px;padding:11px;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+.push .btns .go{background:var(--napoli);border-color:var(--napoli);color:#fff}
 .who{text-align:center;font-size:13px;color:var(--muted)}
 .who button{border:0;background:none;color:var(--colla);font-weight:600;text-decoration:underline;padding:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:30}
@@ -260,6 +267,7 @@ function start(session){
   store=sbStore(sb);
   const timer=setTimeout(()=>{if(!COLS.every(k=>S.loaded[k])){S.stale=true;render()}},10000);
   COLS.forEach(c=>store.subscribe(c,(rows,meta)=>{onData(c,rows,meta);if(COLS.every(k=>S.loaded[k]))clearTimeout(timer)},e=>{S.loaded[c]=true;S.stale=true;render()}));
+  pushState();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&store.reloadAll)store.reloadAll()});
   addEventListener('online',()=>store.reloadAll&&store.reloadAll());
   render();
@@ -293,6 +301,58 @@ async function doLogin(){
   const{data,error}=await sb.auth.signInWithPassword({email,password});
   if(error){err.textContent=error.message&&/invalid/i.test(error.message)?'Email o password non corretti.':'Accesso non riuscito. Controlla la connessione e riprova.';return}
   start(data.session);
+}
+/* ---------- notifiche push ---------- */
+const VAPID_PUBLIC='BLuvj39kLdw-KXoEtHVICE5dVxWrzdavNLCNk1JwKO5E4h5uHBLsmcMUY1T4rOsMuTlRA6wFX_4Qep5DMT9R6sk';
+S.push='checking';
+const pushSupported=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+function b64u(str){const p='='.repeat((4-str.length%4)%4);const b=atob((str+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))}
+async function saveSub(sub){const j=sub.toJSON();const{error}=await sb.from('push_subscriptions').upsert({endpoint:j.endpoint,subscription:j});if(error)throw error}
+async function pushState(){
+  try{
+    if(!sb||!pushSupported()){S.push='unsupported';return}
+    if(Notification.permission==='denied'){S.push='denied';return}
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    S.push=sub&&Notification.permission==='granted'?'on':'off';
+    if(S.push==='on')saveSub(sub).catch(()=>{});
+  }catch(e){S.push='off'}
+  finally{render()}
+}
+async function enablePush(){
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){S.push=perm==='denied'?'denied':'off';render();return}
+    S.push='working';render();
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
+    await saveSub(sub);S.push='on';toast('Notifiche attivate su questo telefono');
+  }catch(e){S.push='off';toast('Non sono riuscito ad attivarle. Riprova tra poco.')}
+  render();
+}
+async function disablePush(){
+  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    if(sub){await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+    S.push='off';toast('Notifiche disattivate')}catch(e){toast('Non sono riuscito a disattivarle')}
+  render();
+}
+async function testPush(){
+  toast('Invio la prova…');
+  const{data,error}=await sb.functions.invoke('invia-promemoria',{body:{test:true}});
+  if(error)toast('Prova non riuscita: controlla la funzione su Supabase');
+  else toast(data&&data.inviate?'Prova inviata: arriva tra qualche secondo':'Nessun telefono registrato');
+}
+function viewPush(){
+  const t={
+    on:`<div class="state on"><i></i>Attive su questo telefono</div><p>Ti avviso alle 8 del mattino, 2 giorni prima di ogni spesa fissa non ancora segnata come pagata.</p>
+        <div class="btns"><button data-act="pushTest">Invia una prova</button><button data-act="pushOff">Disattiva</button></div>`,
+    off:`<div class="state"><i></i>Non attive su questo telefono</div><p>Ricevi un avviso 2 giorni prima di ogni scadenza non pagata. Vanno attivate su ogni telefono, quindi anche su quello di tua moglie.</p>
+        <div class="btns"><button class="go" data-act="pushOn">Attiva notifiche</button></div>`,
+    working:`<div class="state"><i></i>Attivazione in corso…</div>`,
+    checking:`<div class="state"><i></i>Controllo…</div>`,
+    denied:`<div class="state"><i></i>Notifiche bloccate</div><p>Hai bloccato le notifiche per ContoInCasa. Riattivale dalle impostazioni del telefono: su iPhone Impostazioni → Notifiche → ContoInCasa, su Android tieni premuta l'icona → Informazioni app → Notifiche.</p>`,
+    unsupported:`<div class="state"><i></i>Non disponibili qui</div><p>Su iPhone le notifiche funzionano solo aprendo ContoInCasa dall'icona sulla schermata Home (iOS 16.4 o successivo). Su Android e sul computer usa Chrome.</p>`
+  };
+  return`<section><h2>Promemoria scadenze</h2><div class="card push">${t[S.push]||t.checking}</div></section>`;
 }
 async function logout(){await sb.auth.signOut();location.reload()}
 
@@ -402,6 +462,7 @@ function viewRiepilogo(){
   <section><h2>Per categoria</h2><div class="card cats">${catHtml}</div></section>
   <section><h2>Ultimi 6 mesi</h2><div class="card"><div class="months">${monthsHtml}</div>
     <div class="legend"><span><i style="background:var(--napoli)"></i>Casa Napoli</span><span><i style="background:var(--colla)"></i>Casa Colle</span></div></div></section>
+  ${viewPush()}
   <button class="ghost" data-act="csv">Esporta ${MESI[+ym.slice(5)-1]} in Excel (CSV)</button>
   ${userEmail?`<div class="who">Collegato come ${esc(userEmail)} · <button data-act="logout">Esci</button></div>`:''}`;
 }
@@ -511,6 +572,9 @@ document.addEventListener('click',e=>{
   else if(act==='clearEx')clearExamples();
   else if(act==='csv')exportCSV();
   else if(act==='logout')logout();
+  else if(act==='pushOn')enablePush();
+  else if(act==='pushOff')disablePush();
+  else if(act==='pushTest')testPush();
 });
 document.addEventListener('change',e=>{if(e.target.id==='s-ric')syncStart()});
 document.addEventListener('submit',e=>{if(e.target.id==='sheetForm'){e.preventDefault();saveSheet()}else if(e.target.id==='loginForm'){e.preventDefault();doLogin()}});
