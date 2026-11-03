@@ -210,6 +210,7 @@ const METODI=['Carta di credito','Addebito in conto','Contanti'];
 const PERSONE=['Giovanni','Simona'];
 const CARTA='Carta di credito';
 const GIORNO_CARTA=10;
+const INIZIO='2026-11';   // mese di partenza: prima non si conta nulla
 const isCarta=x=>x.metodo===CARTA&&!x.virtuale;
 const chiDefault=()=>{try{const c=localStorage.getItem('cic-chi');if(PERSONE.includes(c))return c}catch(e){}return PERSONE[0]};
 const RIC={mensile:1,bimestrale:2,trimestrale:3,semestrale:6,annuale:12};
@@ -378,6 +379,7 @@ function statoDi(id,d,ym){
   return{pagata:!!p,stato:p?'pagata':d<t?'scaduta':diff<=7?'presto':'attesa'};
 }
 function fisseReali(casa,ym){
+  if(ym<INIZIO)return[];
   return S.fisse.filter(f=>(!casa||f.casa===casa)&&dueIn(f,ym)).map(f=>{const d=scad(f,ym);return{...f,scadenza:d,...statoDi(f.id,d,ym)}});
 }
 /* spese pagate con carta nel mese ym, per casa e titolare */
@@ -388,7 +390,7 @@ function speseCarta(casa,chi,ym){
 }
 /* voci automatiche "Carta di credito <nome>" del mese ym, con le spese del mese prima */
 function vociCarta(casa,ym){
-  const prev=ymAdd(ym,-1);const out=[];
+  const prev=ymAdd(ym,-1);const out=[];if(prev<INIZIO)return out;
   for(const c of (casa?[casa]:Object.keys(CASE))){
     for(const chi of [...PERSONE,'']){
       const det=speseCarta(c,chi,prev);if(!det.length)continue;
@@ -403,7 +405,7 @@ function vociCarta(casa,ym){
 function fisseMese(casa,ym){
   return fisseReali(casa,ym).sort((a,b)=>a.scadenza.localeCompare(b.scadenza)||a.nome.localeCompare(b.nome));
 }
-function movMese(casa,ym){return S.mov.filter(m=>(!casa||m.casa===casa)&&String(m.data).startsWith(ym)).sort((a,b)=>b.data.localeCompare(a.data))}
+function movMese(casa,ym){if(ym<INIZIO)return[];return S.mov.filter(m=>(!casa||m.casa===casa)&&String(m.data).startsWith(ym)).sort((a,b)=>b.data.localeCompare(a.data))}
 function totali(casa,ym){
   const fAll=fisseMese(casa,ym),vAll=[...movMese(casa,ym),...vociCarta(casa,ym)].sort((a,b)=>b.data.localeCompare(a.data));
   const f=fAll.filter(x=>!isCarta(x)),v=vAll.filter(x=>!isCarta(x));   // solo quello che si paga questo mese
@@ -423,6 +425,7 @@ function ymLabel(ym){return MESI[+ym.slice(5)-1]+' '+ym.slice(0,4)}
 function render(){
   setCasaColors();
   $('#mlabel').textContent=ymLabel(S.ym);
+  $('#prev').disabled=S.ym<=INIZIO;$('#prev').style.opacity=S.ym<=INIZIO?.35:1;
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===S.tab));
   const sy=$('#sync');
   sy.className='sync'+(S.mode==='local'?' local':'');
@@ -502,7 +505,7 @@ function viewRiepilogo(){
   const MET_COL={'Carta di credito':'var(--napoli)','Addebito in conto':'var(--colla)','Contanti':'#e0a63a','Non indicato':'var(--muted)'};
   const metHtml=metList.map(([k,v])=>`<div class="cat"><span>${esc(k)}</span><div class="bar"><span style="width:${(v/mmax*100).toFixed(1)}%;background:${MET_COL[k]||'var(--muted)'}"></span></div><b class="num">${eur0.format(v)}</b></div>`).join('')||'<div class="empty">Nessuna spesa questo mese.</div>';
   // ultimi 6 mesi
-  const ms=[...Array(6)].map((_,i)=>ymAdd(ym,i-5));
+  const ms=[...Array(6)].map((_,i)=>ymAdd(ym,i-5)).filter(m=>m>=INIZIO);
   const data=ms.map(m=>({m,n:totali('napoli',m).tot,c:totali('colla',m).tot}));
   const mx=Math.max(1,...data.map(d=>d.n+d.c));
   const monthsHtml=data.map(d=>`<div class="mcol ${d.m===ym?'cur':''}"><span class="val num">${d.n+d.c?eur0.format(d.n+d.c).replace(/\s?€/,'')+'€':'–'}</span>
@@ -522,7 +525,7 @@ function viewRiepilogo(){
   <section><h2>Per categoria</h2><div class="card cats">${catHtml}</div></section>
   <section><h2>Chi ha pagato <small>questo mese</small></h2><div class="card cats">${persHtml}</div></section>
   <section><h2>Per metodo di pagamento</h2><div class="card cats">${metHtml}</div></section>
-  <section><h2>Ultimi 6 mesi</h2><div class="card"><div class="months">${monthsHtml}</div>
+  <section><h2>${ms.length<6?'Andamento dei mesi':'Ultimi 6 mesi'}</h2><div class="card"><div class="months">${monthsHtml}</div>
     <div class="legend"><span><i style="background:var(--napoli)"></i>Casa Napoli</span><span><i style="background:var(--colla)"></i>Casa Colle</span></div></div></section>
   ${viewPush()}
   <button class="ghost" data-act="csv">Esporta ${MESI[+ym.slice(5)-1]} in Excel (CSV)</button>
@@ -639,7 +642,7 @@ let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clea
 document.addEventListener('click',e=>{
   const tab=e.target.closest('#tabs button');
   if(tab){S.tab=tab.dataset.tab;S.armClear=false;try{localStorage.setItem('cic-tab',S.tab)}catch(_){}render();window.scrollTo(0,0);return}
-  if(e.target.closest('#prev')){S.ym=ymAdd(S.ym,-1);render();return}
+  if(e.target.closest('#prev')){if(S.ym>INIZIO){S.ym=ymAdd(S.ym,-1);render()}return}
   if(e.target.closest('#next')){S.ym=ymAdd(S.ym,1);render();return}
   if(e.target.closest('#fab')){openSheet('M');return}
   const a=e.target.closest('[data-act]');if(!a)return;
