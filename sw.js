@@ -1,6 +1,6 @@
 // ContoInCasa: permette all'app di aprirsi anche senza internet.
 // Quando cambi i file dell'app, aumenta il numero di versione qui sotto.
-const VERSIONE = "contoincasa-v4";
+const VERSIONE = "contoincasa-v5";
 const FILE = [
   "./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/logo.png", "./icons/icon-192.png", "./icons/icon-512.png",
