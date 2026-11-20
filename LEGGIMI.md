@@ -37,10 +37,3 @@ L'icona sarà il vostro logo, con il nome ContoInCasa sotto.
 Carica su GitHub i file nuovi al posto dei vecchi. Poi in `sw.js` aumenta il numero di versione (`contoincasa-v1` diventa `contoincasa-v2`), così i telefoni scaricano la versione nuova.
 
 
-Pasword DB Squalo_2026
-
-Ramaglia.giovanni@virgilio.it
-Squalo_33
-
-Simona.brosca@libero.it
-1234biscotto
