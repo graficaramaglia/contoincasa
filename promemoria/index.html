@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Promemoria">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Promemoria</title>
+<style>
+  :root{
+    --bg:#f4f7f6; --card:#fff; --ink:#14201e; --muted:#5f6f6c; --line:#e2e8e6;
+    --accent:#0f766e; --accent-soft:#d9f0ec; --warn-soft:#fdf0dc; --off:#a3b1ae; --radius:16px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0e1514;--card:#16201e;--ink:#e8f0ee;--muted:#93a5a1;--line:#263331;--accent:#2dd4bf;--accent-soft:#123a35;--warn-soft:#3a2c10;--off:#4b5a57}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.4;-webkit-tap-highlight-color:transparent}
+  .wrap{max-width:640px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 16px calc(60px + env(safe-area-inset-bottom))}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  h1{font-size:1.5rem;margin:0}
+  .sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+  button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:600}
+  @media (prefers-color-scheme:dark){button{color:#06201c}}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button.small{padding:6px 10px;font-size:.85rem}
+  button:disabled{opacity:.5;cursor:default}
+  .banner{border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:.92rem}
+  .banner.warn{background:var(--warn-soft)}
+  .banner.ok{background:var(--accent-soft)}
+  .list{display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:center}
+  .card.off{opacity:.55}
+  .emoji{font-size:1.9rem;grid-row:span 2}
+  .title{font-weight:650;font-size:1.05rem;overflow-wrap:anywhere}
+  .meta{color:var(--muted);font-size:.85rem}
+  .count{grid-column:2/4;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.2rem;color:var(--accent)}
+  .card.off .timer{color:var(--off)}
+  .pill{background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:600}
+  .actions{display:flex;gap:6px;margin-left:auto}
+  .switch{position:relative;width:46px;height:26px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .switch span{position:absolute;inset:0;background:var(--off);border-radius:999px;transition:.2s}
+  .switch span::before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked+span{background:var(--accent)}
+  .switch input:checked+span::before{transform:translateX(20px)}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+  .presets{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 18px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+  .overlay.open{display:flex}
+  @media(min-width:640px){.overlay{align-items:center}}
+  .sheet{background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+  @media(min-width:640px){.sheet{border-radius:20px}}
+  .sheet h2{margin:0 0 14px;font-size:1.2rem}
+  label{display:block;font-size:.85rem;color:var(--muted);margin:12px 0 4px}
+  input[type=text],input[type=number],input[type=time],input[type=email],input[type=password]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .days{display:flex;gap:6px;flex-wrap:wrap}
+  .days label{margin:0}
+  .days input{display:none}
+  .days span{display:inline-block;padding:7px 10px;border-radius:8px;border:1px solid var(--line);color:var(--ink);font-size:.85rem;cursor:pointer}
+  .days input:checked+span{background:var(--accent);border-color:var(--accent);color:#fff}
+  .sheet-actions{display:flex;justify-content:space-between;gap:8px;margin-top:20px}
+  .danger{background:transparent;color:#dc2626;border:1px solid currentColor}
+  .err{color:#dc2626;font-size:.9rem;min-height:1.2em;margin-top:8px}
+  .login{max-width:380px;margin:12vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px}
+  .login button{width:100%;margin-top:16px}
+  .foot{margin-top:28px;color:var(--muted);font-size:.8rem;text-align:center}
+  .foot button{margin-top:8px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- Accesso -->
+<div class="wrap hidden" id="loginView">
+  <form class="login" id="loginForm">
+    <h1>🔔 Promemoria</h1>
+    <p class="sub">Entra con lo stesso account di ContoInCasa.</p>
+    <label for="lEmail">Email</label>
+    <input type="email" id="lEmail" autocomplete="username" required>
+    <label for="lPass">Password</label>
+    <input type="password" id="lPass" autocomplete="current-password" required>
+    <button type="submit" id="lBtn">Entra</button>
+    <div class="err" id="lErr"></div>
+  </form>
+</div>
+
+<!-- App -->
+<div class="wrap hidden" id="appView">
+  <header>
+    <div>
+      <h1>Promemoria</h1>
+      <p class="sub" id="clock"></p>
+    </div>
+    <button id="addBtn">+ Nuovo</button>
+  </header>
+
+  <div id="notifBanner"></div>
+
+  <div id="presetBox">
+    <div class="meta">Aggiungi al volo:</div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="list" id="list"><div class="empty">Carico…</div></div>
+
+  <div class="foot">
+    Gli avvisi arrivano come notifiche anche ad app chiusa, sui dispositivi dove le hai attivate.
+    <br><button class="small ghost" id="logoutBtn">Esci</button>
+  </div>
+</div>
+
+<!-- Editor -->
+<div class="overlay" id="overlay">
+  <form class="sheet" id="form">
+    <h2 id="formTitle">Nuovo promemoria</h2>
+    <div class="row" style="grid-template-columns:80px 1fr">
+      <div><label for="fEmoji">Icona</label><input type="text" id="fEmoji" maxlength="4" value="💧"></div>
+      <div><label for="fName">Cosa devo ricordarti?</label><input type="text" id="fName" required maxlength="200" placeholder="es. Bevi un bicchiere d'acqua"></div>
+    </div>
+    <label for="fEvery">Ogni quanti minuti</label>
+    <input type="number" id="fEvery" min="1" max="1440" value="30" required inputmode="numeric">
+    <div class="row">
+      <div><label for="fFrom">Attivo dalle</label><input type="time" id="fFrom" value="08:00"></div>
+      <div><label for="fTo">alle</label><input type="time" id="fTo" value="22:00"></div>
+    </div>
+    <label>Giorni</label>
+    <div class="days" id="fDays"></div>
+    <label for="fGoal">Obiettivo giornaliero (facoltativo)</label>
+    <input type="number" id="fGoal" min="0" max="100" placeholder="es. 8 bicchieri" inputmode="numeric">
+    <div class="err" id="fErr"></div>
+    <div class="sheet-actions">
+      <button type="button" class="danger" id="delBtn">Elimina</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button type="button" class="ghost" id="cancelBtn">Annulla</button>
+        <button type="submit" id="saveBtn">Salva</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(() => {
+  const SUPABASE_URL = "https://mvgnhlgultpdeoxpcfgk.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12Z25obGd1bHRwZGVveHBjZmdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2MTE1NDYsImV4cCI6MjEwOTE4NzU0Nn0.uktlj4ALPvHTeadZ02PzDzCbivn25HkLbi8ZrqwvXI4";
+  const VAPID_PUBLIC = "BLuvj39kLdw-KXoEtHVICE5dVxWrzdavNLCNk1JwKO5E4h5uHBLsmcMUY1T4rOsMuTlRA6wFX_4Qep5DMT9R6sk";
+
+  const DAYS = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  const PRESETS = [
+    {emoji:'💧', nome:"Bevi un bicchiere d'acqua", ogni_min:30, obiettivo:8},
+    {emoji:'🚶', nome:'Alzati e muoviti 5 minuti', ogni_min:60, obiettivo:0},
+    {emoji:'👀', nome:'Riposa gli occhi: 20 secondi lontano dallo schermo', ogni_min:20, obiettivo:0},
+    {emoji:'🧘', nome:'Raddrizza la schiena', ogni_min:45, obiettivo:0},
+  ];
+  const $ = s => document.querySelector(s);
+  const pad = n => String(n).padStart(2,'0');
+  const hhmm = t => (t||'').slice(0,5);
+  const oggiRoma = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Rome'}).format(new Date());
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {auth:{persistSession:true, autoRefreshToken:true}});
+  let items = [];
+  let editingId = null;
+
+  // ---------- accesso ----------
+  async function start(){
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) showApp(); else showLogin();
+  }
+  function showLogin(){ $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
+  function showApp(){ $('#loginView').classList.add('hidden'); $('#appView').classList.remove('hidden'); load(); renderBanner(); }
+  $('#loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('#lBtn').disabled = true; $('#lErr').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email: $('#lEmail').value.trim(), password: $('#lPass').value });
+    $('#lBtn').disabled = false;
+    if (error) $('#lErr').textContent = 'Email o password non corretti.'; else showApp();
+  });
+  $('#logoutBtn').onclick = async () => { await sb.auth.signOut(); items = []; showLogin(); };
+
+  // ---------- dati ----------
+  async function load(){
+    const { data, error } = await sb.from('promemoria').select('*').order('creato_il');
+    if (error){ if (error.code === 'PGRST301' || /JWT/.test(error.message)) showLogin(); return; }
+    items = data; render();
+  }
+  async function add(p){
+    const { error } = await sb.from('promemoria').insert(p);
+    if (error) alertBox(error.message); await load();
+  }
+  async function rpc(name, args){
+    const { data, error } = await sb.rpc(name, args);
+    if (error) alertBox(error.message);
+    else if (data) { const i = items.findIndex(x => x.id === data.id); if (i >= 0) items[i] = data; render(); }
+  }
+  function alertBox(msg){ $('#notifBanner').insertAdjacentHTML('afterbegin', `<div class="banner warn">Qualcosa non è andato: ${esc(msg)}</div>`); }
+
+  // ---------- notifiche push ----------
+  const pushOk = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
+
+  async function currentSub(){
+    if (!pushOk()) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return reg.pushManager.getSubscription();
+  }
+  async function renderBanner(){
+    const b = $('#notifBanner');
+    if (isIOS && !standalone){
+      b.innerHTML = `<div class="banner warn">Su iPhone le notifiche funzionano solo dall'app installata: tocca <b>Condividi</b> → <b>Aggiungi alla schermata Home</b>, poi apri Promemoria dall'icona.</div>`;
+      return;
+    }
+    if (!pushOk()){ b.innerHTML = `<div class="banner warn">Questo browser non supporta le notifiche push.</div>`; return; }
+    if (Notification.permission === 'denied'){
+      b.innerHTML = `<div class="banner warn">Le notifiche sono bloccate per questa app. Riattivale dalle impostazioni del telefono o del browser.</div>`; return;
+    }
+    const sub = await currentSub();
+    if (sub && Notification.permission === 'granted'){
+      // assicura che il dispositivo sia registrato a nome dell'utente attuale
+      sb.from('promemoria_dispositivi').upsert({ endpoint: sub.endpoint, subscription: sub.toJSON() }).then(()=>{});
+      b.innerHTML = `<div class="banner ok">🔔 Notifiche attive su questo dispositivo. <button class="small ghost" id="testBtn">Prova</button></div>`;
+      $('#testBtn').onclick = test;
+    } else {
+      b.innerHTML = `<div class="banner warn">Attiva le notifiche per ricevere i promemoria su questo dispositivo. <button class="small" id="permBtn">Attiva notifiche</button></div>`;
+      $('#permBtn').onclick = enablePush;
+    }
+  }
+  async function enablePush(){
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return renderBanner();
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: b64u(VAPID_PUBLIC) });
+      const { error } = await sb.from('promemoria_dispositivi').upsert({ endpoint: sub.endpoint, subscription: sub.toJSON() });
+      if (error) throw error;
+      await renderBanner(); test();
+    } catch(e){ alertBox(e.message || String(e)); }
+  }
+  async function test(){
+    const btn = $('#testBtn'); if (btn){ btn.disabled = true; btn.textContent = 'Invio…'; }
+    const { data, error } = await sb.functions.invoke('promemoria-tick', { body: { test:true } });
+    if (btn){ btn.disabled = false; btn.textContent = error ? 'Errore, riprova' : (data && data.inviate ? 'Inviata ✓' : 'Nessun dispositivo'); }
+  }
+
+  // ---------- vista ----------
+  function giorniLabel(g){
+    if (g.length === 7) return 'tutti i giorni';
+    if (g.length === 5 && [0,1,2,3,4].every(d => g.includes(d))) return 'lun–ven';
+    return [...g].sort().map(d => DAYS[d]).join(' ');
+  }
+  function render(){
+    const list = $('#list');
+    if (!items.length) list.innerHTML = `<div class="empty">Nessun promemoria ancora.<br>Scegline uno qui sopra o premi <b>+ Nuovo</b>.</div>`;
+    else list.innerHTML = items.map(it => {
+      const c = it.conteggio_giorno === oggiRoma() ? it.conteggio : 0;
+      const goal = it.obiettivo ? `<span class="pill">Oggi ${c}/${it.obiettivo}</span>` : (c ? `<span class="pill">Oggi ${c}</span>` : '');
+      return `<div class="card ${it.attivo?'':'off'}" data-id="${it.id}">
+        <div class="emoji">${esc(it.emoji)}</div>
+        <div class="title">${esc(it.nome)}</div>
+        <label class="switch" title="Attiva/disattiva"><input type="checkbox" data-act="toggle" ${it.attivo?'checked':''}><span></span></label>
+        <div class="meta">Ogni ${it.ogni_min} min · ${hhmm(it.dalle)}–${hhmm(it.alle)} · ${giorniLabel(it.giorni)}</div>
+        <div></div>
+        <div class="count">
+          <span class="timer" data-timer></span>${goal}
+          <div class="actions">
+            <button class="small ghost" data-act="snooze" title="Rimanda di 5 minuti">+5′</button>
+            <button class="small ghost" data-act="edit">Modifica</button>
+            <button class="small" data-act="done">Fatto ✓</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    const have = new Set(items.map(i => i.nome));
+    const free = PRESETS.filter(p => !have.has(p.nome));
+    $('#presetBox').classList.toggle('hidden', !free.length);
+    $('#presets').innerHTML = free.map(p => `<button class="small ghost" data-preset="${PRESETS.indexOf(p)}">${p.emoji} ${esc(p.nome.split(':')[0])} · ${p.ogni_min}′</button>`).join('');
+    tick();
+  }
+  function fmt(ts){
+    const d = new Date(ts), left = d - Date.now();
+    if (left <= 0) return 'adesso';
+    if (left > 3600000){
+      const same = d.toDateString() === new Date().toDateString();
+      return 'alle ' + (same ? '' : DAYS[(d.getDay()+6)%7] + ' ') + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    const s = Math.floor(left/1000); return `tra ${pad(Math.floor(s/60))}:${pad(s%60)}`;
+  }
+  function tick(){
+    const now = new Date();
+    $('#clock').textContent = now.toLocaleDateString('it-IT',{weekday:'long', day:'numeric', month:'long'}) + ' · ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    document.querySelectorAll('.card').forEach(card => {
+      const it = items.find(x => x.id === card.dataset.id); if (!it) return;
+      card.querySelector('[data-timer]').textContent = !it.attivo ? 'In pausa' : (it.prossimo_at ? fmt(it.prossimo_at) : 'Nessun orario attivo');
+    });
+  }
+
+  // ---------- eventi ----------
+  $('#presets').addEventListener('click', e => {
+    const b = e.target.closest('[data-preset]'); if (!b) return;
+    b.disabled = true; add({ ...PRESETS[+b.dataset.preset] });
+  });
+  $('#list').addEventListener('click', e => {
+    const card = e.target.closest('.card'); const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!card || !act) return;
+    const id = card.dataset.id;
+    if (act === 'done') rpc('promemoria_fatto', { p_id:id });
+    else if (act === 'snooze') rpc('promemoria_rimanda', { p_id:id, p_min:5 });
+    else if (act === 'edit') openEditor(id);
+  });
+  $('#list').addEventListener('change', async e => {
+    if (e.target.dataset.act !== 'toggle') return;
+    const id = e.target.closest('.card').dataset.id;
+    const { error } = await sb.from('promemoria').update({ attivo: e.target.checked }).eq('id', id);
+    if (error) alertBox(error.message); load();
+  });
+
+  $('#fDays').innerHTML = DAYS.map((d,i) => `<label><input type="checkbox" value="${i}" checked><span>${d}</span></label>`).join('');
+  function openEditor(id){
+    editingId = id || null;
+    const it = id ? items.find(x => x.id === id) : { emoji:'💧', nome:'', ogni_min:30, dalle:'08:00', alle:'22:00', giorni:[0,1,2,3,4,5,6], obiettivo:0 };
+    $('#formTitle').textContent = id ? 'Modifica promemoria' : 'Nuovo promemoria';
+    $('#fEmoji').value = it.emoji; $('#fName').value = it.nome; $('#fEvery').value = it.ogni_min;
+    $('#fFrom').value = hhmm(it.dalle); $('#fTo').value = hhmm(it.alle); $('#fGoal').value = it.obiettivo || '';
+    $('#fDays').querySelectorAll('input').forEach(c => c.checked = it.giorni.includes(+c.value));
+    $('#delBtn').classList.toggle('hidden', !id); $('#fErr').textContent = '';
+    $('#overlay').classList.add('open');
+  }
+  const closeEditor = () => $('#overlay').classList.remove('open');
+  $('#addBtn').onclick = () => openEditor();
+  $('#cancelBtn').onclick = closeEditor;
+  $('#overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeEditor(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditor(); });
+  let delArmed = false;
+  $('#delBtn').onclick = async () => {
+    if (!delArmed){ delArmed = true; $('#delBtn').textContent = 'Conferma eliminazione'; setTimeout(() => { delArmed = false; $('#delBtn').textContent = 'Elimina'; }, 3000); return; }
+    delArmed = false; $('#delBtn').textContent = 'Elimina';
+    const { error } = await sb.from('promemoria').delete().eq('id', editingId);
+    if (error) return $('#fErr').textContent = error.message;
+    closeEditor(); load();
+  };
+  $('#form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const giorni = [...$('#fDays').querySelectorAll('input:checked')].map(c => +c.value);
+    const p = {
+      emoji: $('#fEmoji').value.trim() || '🔔',
+      nome: $('#fName').value.trim(),
+      ogni_min: Math.min(1440, Math.max(1, +$('#fEvery').value || 30)),
+      dalle: $('#fFrom').value || '00:00',
+      alle: $('#fTo').value || '23:59',
+      giorni: giorni.length ? giorni : [0,1,2,3,4,5,6],
+      obiettivo: Math.min(100, Math.max(0, +$('#fGoal').value || 0)),
+    };
+    if (!p.nome) return;
+    if (p.dalle >= p.alle) return $('#fErr').textContent = "L'orario di inizio deve venire prima di quello di fine.";
+    $('#saveBtn').disabled = true;
+    const { error } = editingId
+      ? await sb.from('promemoria').update(p).eq('id', editingId)
+      : await sb.from('promemoria').insert(p);
+    $('#saveBtn').disabled = false;
+    if (error) return $('#fErr').textContent = error.message;
+    closeEditor(); load();
+  });
+
+  // aggiornamenti: notifica arrivata, app riaperta, ogni minuto
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tipo === 'aggiorna') load(); });
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#appView').classList.contains('hidden')) load(); });
+  setInterval(tick, 1000);
+  setInterval(() => { if (!document.hidden && !$('#appView').classList.contains('hidden')) load(); }, 60000);
+  sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') showLogin(); });
+  start();
+})();
+</script>
+</body>
+</html>
